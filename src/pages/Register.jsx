@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { auth } from '../firebase/firebaseConfig';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { auth, db } from '../firebase/firebaseConfig';
 
 function Register() {
   const navigate = useNavigate();
@@ -39,9 +40,17 @@ function Register() {
 
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
 
-      await updateProfile(userCredential.user, {
+      await updateProfile(user, {
         displayName: name,
+      });
+
+      await setDoc(doc(db, 'users', user.uid), {
+        fullName: name,
+        email: email,
+        role: 'parent',
+        createdAt: serverTimestamp(),
       });
 
       setMessage('Account created successfully. Redirecting to login...');
@@ -51,10 +60,14 @@ function Register() {
         navigate('/login');
       }, 1500);
     } catch (error) {
+      console.log('Registration error:', error);
+
       if (error.code === 'auth/email-already-in-use') {
         setMessage('This email is already registered.');
       } else if (error.code === 'auth/invalid-email') {
         setMessage('Please enter a valid email address.');
+      } else if (error.code === 'permission-denied') {
+        setMessage('Firestore permission denied. Please check your Firestore rules.');
       } else {
         setMessage('Something went wrong. Please try again.');
       }

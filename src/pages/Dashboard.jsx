@@ -1,7 +1,17 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
-import { auth } from '../firebase/firebaseConfig';
+import {
+  addDoc,
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  orderBy,
+  query,
+  serverTimestamp,
+} from 'firebase/firestore';
+import { auth, db } from '../firebase/firebaseConfig';
 
 const developmentData = {
   infant: {
@@ -74,11 +84,73 @@ const parentingTips = {
 
 function Dashboard() {
   const navigate = useNavigate();
+  const currentUser = auth.currentUser;
+
+  const [profile, setProfile] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+
+  const [childName, setChildName] = useState('');
+  const [childAge, setChildAge] = useState('');
+  const [childGender, setChildGender] = useState('');
+  const [children, setChildren] = useState([]);
+  const [childMessage, setChildMessage] = useState('');
 
   const [age, setAge] = useState('');
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [activeTip, setActiveTip] = useState('nutrition');
+
+  const userName = profile?.fullName || currentUser?.displayName || 'Parent';
+  const userEmail = profile?.email || currentUser?.email || '';
+  const userRole = profile?.role || 'parent';
+  const avatarLetter = userName.charAt(0).toUpperCase();
+
+  useEffect(() => {
+    async function fetchUserProfile() {
+      if (!currentUser) {
+        setProfileLoading(false);
+        return;
+      }
+
+      try {
+        const userRef = doc(db, 'users', currentUser.uid);
+        const userSnap = await getDoc(userRef);
+
+        if (userSnap.exists()) {
+          setProfile(userSnap.data());
+        }
+      } catch (error) {
+        console.log('Error loading user profile:', error);
+      } finally {
+        setProfileLoading(false);
+      }
+    }
+
+    fetchUserProfile();
+  }, [currentUser]);
+
+  useEffect(() => {
+    async function fetchChildren() {
+      if (!currentUser) return;
+
+      try {
+        const childrenRef = collection(db, 'users', currentUser.uid, 'children');
+        const childrenQuery = query(childrenRef, orderBy('createdAt', 'desc'));
+        const childrenSnap = await getDocs(childrenQuery);
+
+        const childrenList = childrenSnap.docs.map((docItem) => ({
+          id: docItem.id,
+          ...docItem.data(),
+        }));
+
+        setChildren(childrenList);
+      } catch (error) {
+        console.log('Error loading child profiles:', error);
+      }
+    }
+
+    fetchChildren();
+  }, [currentUser]);
 
   async function handleLogout() {
     try {
@@ -89,24 +161,87 @@ function Dashboard() {
     }
   }
 
+  function getDevelopmentResult(months) {
+    if (months <= 12) {
+      return developmentData.infant;
+    }
+
+    if (months <= 24) {
+      return developmentData.toddler1;
+    }
+
+    return developmentData.toddler2;
+  }
+
   function handleDevelopmentCheck() {
-    const childAge = parseInt(age, 10);
+    const enteredAge = parseInt(age, 10);
 
     setError('');
     setResult(null);
 
-    if (Number.isNaN(childAge) || childAge < 0 || childAge > 36) {
+    if (Number.isNaN(enteredAge) || enteredAge < 0 || enteredAge > 36) {
       setError('Please enter a valid age between 0 and 36 months.');
       return;
     }
 
-    if (childAge <= 12) {
-      setResult(developmentData.infant);
-    } else if (childAge <= 24) {
-      setResult(developmentData.toddler1);
-    } else {
-      setResult(developmentData.toddler2);
+    setResult(getDevelopmentResult(enteredAge));
+  }
+
+  async function handleSaveChild(e) {
+    e.preventDefault();
+
+    setChildMessage('');
+
+    if (!currentUser) {
+      setChildMessage('You must be logged in to save a child profile.');
+      return;
     }
+
+    const parsedAge = parseInt(childAge, 10);
+
+    if (!childName || !childAge || !childGender) {
+      setChildMessage('Please fill in child name, age, and gender.');
+      return;
+    }
+
+    if (Number.isNaN(parsedAge) || parsedAge < 0 || parsedAge > 36) {
+      setChildMessage('Child age must be between 0 and 36 months.');
+      return;
+    }
+
+    try {
+      const childrenRef = collection(db, 'users', currentUser.uid, 'children');
+
+      const docRef = await addDoc(childrenRef, {
+        childName,
+        ageMonths: parsedAge,
+        gender: childGender,
+        createdAt: serverTimestamp(),
+      });
+
+      const newChild = {
+        id: docRef.id,
+        childName,
+        ageMonths: parsedAge,
+        gender: childGender,
+      };
+
+      setChildren((prevChildren) => [newChild, ...prevChildren]);
+
+      setChildName('');
+      setChildAge('');
+      setChildGender('');
+      setChildMessage('Child profile saved successfully.');
+    } catch (error) {
+      console.log('Error saving child profile:', error);
+      setChildMessage('Unable to save child profile. Please try again.');
+    }
+  }
+
+  function handleUseChildAge(child) {
+    setAge(String(child.ageMonths));
+    setError('');
+    setResult(getDevelopmentResult(child.ageMonths));
   }
 
   return (
@@ -119,8 +254,16 @@ function Dashboard() {
           </div>
 
           <div className="topbar-user">
-            <div className="user-avatar">P</div>
-            <button onClick={handleLogout} className="btn btn-outline btn-sm">
+            <div className="user-avatar">{avatarLetter}</div>
+
+            <div className="user-info">
+              <span className="user-name">{userName}</span>
+              <span className="user-meta">
+                {userRole === 'admin' ? 'Admin' : 'Parent'} • {userEmail}
+              </span>
+            </div>
+
+            <button onClick={handleLogout} className="logout-btn">
               Logout
             </button>
           </div>
@@ -130,13 +273,103 @@ function Dashboard() {
       <main className="dashboard-main">
         <div className="container">
           <div className="welcome-banner">
-            <h2>Welcome back, Parent!</h2>
+            <span className="dashboard-status">Authenticated Parent Portal</span>
+
+            <h2>
+              {profileLoading ? 'Loading profile...' : `Welcome back, ${userName}!`}
+            </h2>
+
             <p>
-              Track your child&apos;s milestones, explore activities, and get support in one place.
+              Track your child&apos;s development, review age-based activities, and explore
+              parenting guidance in one secure dashboard.
             </p>
           </div>
 
           <div className="dashboard-grid">
+            <div className="dash-card">
+              <div className="dash-card-header">
+                <div className="dash-card-icon icon-green">👶</div>
+                <h3>Child Profile</h3>
+              </div>
+
+              <p className="dash-card-desc">
+                Save your child&apos;s basic details so the dashboard can support personalized development tracking.
+              </p>
+
+              <form onSubmit={handleSaveChild} className="child-profile-form">
+                <div className="form-group">
+                  <label htmlFor="child-name">Child Name</label>
+                  <input
+                    type="text"
+                    id="child-name"
+                    placeholder="e.g. Ayaan"
+                    value={childName}
+                    onChange={(e) => setChildName(e.target.value)}
+                  />
+                </div>
+
+                <div className="child-form-row">
+                  <div className="form-group">
+                    <label htmlFor="child-profile-age">Age (months)</label>
+                    <input
+                      type="number"
+                      id="child-profile-age"
+                      placeholder="e.g. 18"
+                      min="0"
+                      max="36"
+                      value={childAge}
+                      onChange={(e) => setChildAge(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="child-gender">Gender</label>
+                    <select
+                      id="child-gender"
+                      value={childGender}
+                      onChange={(e) => setChildGender(e.target.value)}
+                    >
+                      <option value="">Select</option>
+                      <option value="Female">Female</option>
+                      <option value="Male">Male</option>
+                      <option value="Prefer not to say">Prefer not to say</option>
+                    </select>
+                  </div>
+                </div>
+
+                <button type="submit" className="btn btn-primary form-btn">
+                  Save Child Profile
+                </button>
+              </form>
+
+              {childMessage && <p className="child-message">{childMessage}</p>}
+
+              {children.length > 0 && (
+                <div className="saved-children">
+                  <h4>Saved Child Profile</h4>
+
+                  {children.map((child) => (
+                    <div className="saved-child-card" key={child.id}>
+                      <div>
+                        <strong>{child.childName}</strong>
+                        <p>
+                          {child.ageMonths} months • {child.gender}
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="use-age-btn"
+                        onClick={() => handleUseChildAge(child)}
+                      >
+                        Use Age
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="dash-card">
               <div className="dash-card-header">
                 <div className="dash-card-icon icon-green">📊</div>
@@ -206,9 +439,7 @@ function Dashboard() {
                 Planned for the next development phase with real AI-powered parenting support.
               </p>
 
-              <div className="future-badge">
-                Future AI Feature
-              </div>
+              <div className="future-badge">Future AI Feature</div>
             </div>
 
             <div className="dash-card dash-card-full">
