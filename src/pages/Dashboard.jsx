@@ -7,6 +7,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  limit,
   orderBy,
   query,
   serverTimestamp,
@@ -95,9 +96,15 @@ function Dashboard() {
   const [children, setChildren] = useState([]);
   const [childMessage, setChildMessage] = useState('');
 
+  const [selectedChild, setSelectedChild] = useState(null);
+
   const [age, setAge] = useState('');
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
+  const [checkMessage, setCheckMessage] = useState('');
+  const [developmentChecks, setDevelopmentChecks] = useState([]);
+  const [selectedCheck, setSelectedCheck] = useState(null);
+
   const [activeTip, setActiveTip] = useState('nutrition');
 
   const userName = profile?.fullName || currentUser?.displayName || 'Parent';
@@ -152,6 +159,29 @@ function Dashboard() {
     fetchChildren();
   }, [currentUser]);
 
+  useEffect(() => {
+    async function fetchDevelopmentChecks() {
+      if (!currentUser) return;
+
+      try {
+        const checksRef = collection(db, 'users', currentUser.uid, 'developmentChecks');
+        const checksQuery = query(checksRef, orderBy('checkedAt', 'desc'), limit(5));
+        const checksSnap = await getDocs(checksQuery);
+
+        const checksList = checksSnap.docs.map((docItem) => ({
+          id: docItem.id,
+          ...docItem.data(),
+        }));
+
+        setDevelopmentChecks(checksList);
+      } catch (error) {
+        console.log('Error loading development check history:', error);
+      }
+    }
+
+    fetchDevelopmentChecks();
+  }, [currentUser]);
+
   async function handleLogout() {
     try {
       await signOut(auth);
@@ -177,6 +207,7 @@ function Dashboard() {
     const enteredAge = parseInt(age, 10);
 
     setError('');
+    setCheckMessage('');
     setResult(null);
 
     if (Number.isNaN(enteredAge) || enteredAge < 0 || enteredAge > 36) {
@@ -239,9 +270,81 @@ function Dashboard() {
   }
 
   function handleUseChildAge(child) {
+    setSelectedChild(child);
     setAge(String(child.ageMonths));
     setError('');
+    setCheckMessage('');
     setResult(getDevelopmentResult(child.ageMonths));
+  }
+
+  async function handleSaveDevelopmentCheck() {
+    if (!currentUser) {
+      setCheckMessage('You must be logged in to save this check.');
+      return;
+    }
+
+    if (!result) {
+      setCheckMessage('Please run a development check before saving.');
+      return;
+    }
+
+    const enteredAge = parseInt(age, 10);
+
+    if (Number.isNaN(enteredAge) || enteredAge < 0 || enteredAge > 36) {
+      setCheckMessage('Please enter a valid age before saving.');
+      return;
+    }
+
+    try {
+      const checksRef = collection(db, 'users', currentUser.uid, 'developmentChecks');
+
+      const checkData = {
+        childId: selectedChild?.id || null,
+        childName: selectedChild?.childName || 'Manual age entry',
+        ageMonths: enteredAge,
+        developmentRange: result.label,
+        milestones: result.milestones,
+        activities: result.activities,
+        checkedAt: serverTimestamp(),
+      };
+
+      const docRef = await addDoc(checksRef, checkData);
+      setSelectedCheck({
+  id: docRef.id,
+  ...checkData,
+  checkedAt: new Date(),
+});
+
+      setDevelopmentChecks((prevChecks) => [
+        {
+          id: docRef.id,
+          ...checkData,
+          checkedAt: new Date(),
+        },
+        ...prevChecks.slice(0, 4),
+      ]);
+
+      setCheckMessage('Development check saved successfully.');
+    } catch (error) {
+      console.log('Error saving development check:', error);
+      setCheckMessage('Unable to save development check. Please try again.');
+    }
+  }
+
+  function formatCheckDate(check) {
+    if (!check.checkedAt) {
+      return 'Just now';
+    }
+
+    if (check.checkedAt.toDate) {
+      return check.checkedAt.toDate().toLocaleDateString();
+    }
+
+    if (check.checkedAt instanceof Date) {
+      return check.checkedAt.toLocaleDateString();
+    }
+
+    return 'Recently';
   }
 
   return (
@@ -380,6 +483,12 @@ function Dashboard() {
                 Enter your child&apos;s age in months to see expected milestones and activities.
               </p>
 
+              {selectedChild && (
+                <div className="selected-child-note">
+                  Using saved profile: <strong>{selectedChild.childName}</strong>
+                </div>
+              )}
+
               <div className="age-input-row">
                 <div className="form-group">
                   <label htmlFor="child-age">Child&apos;s Age (months)</label>
@@ -390,7 +499,10 @@ function Dashboard() {
                     min="0"
                     max="36"
                     value={age}
-                    onChange={(e) => setAge(e.target.value)}
+                    onChange={(e) => {
+                      setAge(e.target.value);
+                      setSelectedChild(null);
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         handleDevelopmentCheck();
@@ -425,8 +537,86 @@ function Dashboard() {
                       ))}
                     </ul>
                   </div>
+
+                  <button
+                    type="button"
+                    className="save-check-btn"
+                    onClick={handleSaveDevelopmentCheck}
+                  >
+                    Save Check Result
+                  </button>
                 </div>
               )}
+
+              {checkMessage && <p className="check-message">{checkMessage}</p>}
+
+             {developmentChecks.length > 0 && (
+  <div className="recent-checks">
+    <h4>Recent Development Checks</h4>
+
+    {developmentChecks.map((check) => (
+      <div className="recent-check-card" key={check.id}>
+        <div>
+          <strong>{check.childName}</strong>
+          <p>
+            {check.ageMonths} months • {check.developmentRange}
+          </p>
+        </div>
+
+        <div className="check-actions">
+          <span>{formatCheckDate(check)}</span>
+          <button
+            type="button"
+            className="view-details-btn"
+            onClick={() => setSelectedCheck(check)}
+          >
+            View Details
+          </button>
+        </div>
+      </div>
+    ))}
+
+    {selectedCheck && (
+      <div className="check-detail-panel">
+        <div className="check-detail-header">
+          <div>
+            <h4>Development Check Details</h4>
+            <p>
+              {selectedCheck.childName} • {selectedCheck.ageMonths} months •{' '}
+              {selectedCheck.developmentRange}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            className="close-detail-btn"
+            onClick={() => setSelectedCheck(null)}
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="detail-section">
+          <h5>Milestones Shown</h5>
+          <ul>
+            {selectedCheck.milestones?.map((milestone, index) => (
+              <li key={index}>{milestone}</li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="detail-section activity-detail">
+          <h5>Recommended Activities</h5>
+          <ul>
+            {selectedCheck.activities?.map((activity, index) => (
+              <li key={index}>{activity}</li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    )}
+  </div>
+)}
             </div>
 
             <div className="dash-card coming-soon-card">

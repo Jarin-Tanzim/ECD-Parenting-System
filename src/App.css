@@ -990,3 +990,221 @@ footer span {
     grid-template-columns: 1fr;
   }
 }
+.selected-child-note {
+  background: rgba(122,171,138,0.12);
+  border: 1.5px solid rgba(122,171,138,0.22);
+  color: var(--sage-dark);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  margin-bottom: 14px;
+}
+
+.save-check-btn {
+  width: 100%;
+  border: none;
+  background: var(--amber);
+  color: #fff;
+  border-radius: var(--radius-sm);
+  padding: 11px 16px;
+  font-family: 'Nunito', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: var(--transition);
+  margin-top: 4px;
+}
+
+.save-check-btn:hover {
+  background: #e0922e;
+  transform: translateY(-1px);
+  box-shadow: 0 5px 14px rgba(245, 167, 66, 0.25);
+}
+
+.check-message {
+  margin-top: 14px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--sage-dark);
+}
+
+.recent-checks {
+  margin-top: 22px;
+  border-top: 1px solid #eef0ee;
+  padding-top: 16px;
+}
+
+.recent-checks h4 {
+  font-size: 0.86rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--sage-dark);
+  margin-bottom: 10px;
+}
+
+.recent-check-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  background: var(--cream);
+  border: 1.5px solid rgba(122,171,138,0.16);
+  border-radius: var(--radius-sm);
+  padding: 13px 15px;
+  margin-bottom: 10px;
+}
+
+.recent-check-card strong {
+  color: var(--text-dark);
+  font-size: 0.95rem;
+}
+
+.recent-check-card p {
+  color: var(--text-light);
+  font-size: 0.84rem;
+  margin-top: 2px;
+}
+
+.recent-check-card span {
+  color: var(--text-light);
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.check-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 7px;
+}
+
+.view-details-btn {
+  border: none;
+  background: #fff;
+  color: var(--sage-dark);
+  border: 1.5px solid var(--sage-light);
+  border-radius: 999px;
+  padding: 6px 11px;
+  font-family: 'Nunito', sans-serif;
+  font-size: 0.76rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+}
+
+.view-details-btn:hover {
+  background: var(--sage);
+  color: #fff;
+}
+
+.check-detail-panel {
+  margin-top: 16px;
+  background: #fff;
+  border: 1.5px solid rgba(122,171,138,0.22);
+  border-radius: var(--radius-sm);
+  padding: 18px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.06);
+}
+
+.check-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  border-bottom: 1px solid #eef0ee;
+  padding-bottom: 12px;
+  margin-bottom: 14px;
+}
+
+.check-detail-header h4 {
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--sage-dark);
+  margin-bottom: 4px;
+}
+
+.check-detail-header p {
+  color: var(--text-light);
+  font-size: 0.84rem;
+}
+
+.close-detail-btn {
+  border: none;
+  background: var(--cream);
+  color: var(--text-mid);
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.close-detail-btn:hover {
+  background: #fde8e8;
+  color: #c0392b;
+}
+
+.detail-section {
+  background: var(--cream);
+  border-left: 4px solid var(--sage);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+
+.detail-section h5 {
+  font-size: 0.82rem;
+  color: var(--sage-dark);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: 8px;
+}
+
+.detail-section ul {
+  list-style: none;
+  padding: 0;
+}
+
+.detail-section li {
+  padding: 5px 0;
+  color: var(--text-mid);
+  font-size: 0.9rem;
+  display: flex;
+  gap: 8px;
+}
+
+.detail-section li::before {
+  content: '✓';
+  color: var(--sage);
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.activity-detail {
+  border-left-color: var(--amber);
+}
+
+.activity-detail h5 {
+  color: #9a6500;
+}
+
+.activity-detail li::before {
+  content: '⭐';
+  color: var(--amber);
+}
+
+@media (max-width: 768px) {
+  .recent-check-card {
+    align-items: flex-start;
+  }
+
+  .check-actions {
+    align-items: flex-start;
+  }
+}
