@@ -6,6 +6,7 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Chatbot from './pages/Chatbot';
 import ProtectedRoute from './components/ProtectedRoute';
+import ParentingTips from './pages/ParentingTips';
 
 function App() {
   return (
@@ -31,7 +32,16 @@ function App() {
           </ProtectedRoute>
         }
       />
+      <Route
+  path="/parenting-tips"
+  element={
+    <ProtectedRoute>
+      <ParentingTips />
+    </ProtectedRoute>
+  }
+/>
     </Routes>
+    
   );
 }
 
