@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import {
   addDoc,
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -11,360 +12,347 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  updateDoc,
 } from 'firebase/firestore';
 import { auth, db } from '../firebase/firebaseConfig';
-
-const developmentData = {
-  infant: {
-    label: '0 - 12 Months',
-    milestones: [
-      'Responds to sounds and voices',
-      'Recognizes familiar faces',
-      'Starts sitting or crawling',
-    ],
-    activities: [
-      'Tummy time exercises',
-      'Soft music and singing',
-      'Object tracking games',
-    ],
-  },
-  toddler1: {
-    label: '13 - 24 Months',
-    milestones: [
-      'Starts walking independently',
-      'Says simple words like mama, dada, or no',
-      'Follows basic instructions',
-    ],
-    activities: [
-      'Building blocks play',
-      'Reading colorful picture books',
-      'Naming everyday objects together',
-    ],
-  },
-  toddler2: {
-    label: '25 - 36 Months',
-    milestones: [
-      'Speaks short sentences',
-      'Plays alongside other children',
-      'Shows increasing independence',
-    ],
-    activities: [
-      'Drawing and simple coloring',
-      'Storytelling and pretend play',
-      'Sorting colors and shapes',
-    ],
-  },
-};
-
-const parentingTips = {
-  nutrition: [
-    'Offer a colorful variety of fruits and vegetables at meals.',
-    'Keep your child hydrated with water throughout the day.',
-    'Limit sugary drinks, salty snacks, and ultra-processed foods.',
-    'Maintain regular meal and snack times to build healthy routines.',
-  ],
-  behavior: [
-    'Use calm and consistent responses when your child is upset.',
-    'Praise good behavior instead of only correcting mistakes.',
-    'Set simple limits that match your child’s age and understanding.',
-    'Model the behavior you want your child to learn.',
-  ],
-  learning: [
-    'Read aloud daily to build vocabulary and imagination.',
-    'Use songs, rhymes, and simple games to introduce letters and numbers.',
-    'Encourage puzzles, sorting toys, drawing, and pretend play.',
-    'Prioritize hands-on activities over screen time.',
-  ],
-  islamic: [
-    'Teach simple duas and Islamic manners from an early age.',
-    'Say Bismillah before meals and Alhamdulillah after eating.',
-    'Let your child observe prayer time as part of the daily routine.',
-    'Share simple stories of the Prophets to build character and faith.',
-  ],
-};
+import {
+  getActivitySuggestions,
+  getQuestionsForAge,
+  getSafeFeedback,
+} from '../data/developmentMilestones';
 
 function Dashboard() {
   const navigate = useNavigate();
   const currentUser = auth.currentUser;
 
   const [profile, setProfile] = useState(null);
-  const [profileLoading, setProfileLoading] = useState(true);
+  const [children, setChildren] = useState([]);
+  const [developmentChecks, setDevelopmentChecks] = useState([]);
 
   const [childName, setChildName] = useState('');
   const [childAge, setChildAge] = useState('');
   const [childGender, setChildGender] = useState('');
-  const [children, setChildren] = useState([]);
+  const [editingChildId, setEditingChildId] = useState(null);
   const [childMessage, setChildMessage] = useState('');
 
   const [selectedChild, setSelectedChild] = useState(null);
-
-  const [age, setAge] = useState('');
+  const [answers, setAnswers] = useState({});
   const [result, setResult] = useState(null);
-  const [error, setError] = useState('');
   const [checkMessage, setCheckMessage] = useState('');
-  const [developmentChecks, setDevelopmentChecks] = useState([]);
   const [selectedCheck, setSelectedCheck] = useState(null);
-
-  const [activeTip, setActiveTip] = useState('nutrition');
 
   const userName = profile?.fullName || currentUser?.displayName || 'Parent';
   const userEmail = profile?.email || currentUser?.email || '';
-  const userRole = profile?.role || 'parent';
   const avatarLetter = userName.charAt(0).toUpperCase();
 
-  useEffect(() => {
-    async function fetchUserProfile() {
-      if (!currentUser) {
-        setProfileLoading(false);
-        return;
-      }
+  const latestCheck = developmentChecks[0] || null;
 
-      try {
-        const userRef = doc(db, 'users', currentUser.uid);
-        const userSnap = await getDoc(userRef);
-
-        if (userSnap.exists()) {
-          setProfile(userSnap.data());
-        }
-      } catch (error) {
-        console.log('Error loading user profile:', error);
-      } finally {
-        setProfileLoading(false);
-      }
-    }
-
-    fetchUserProfile();
-  }, [currentUser]);
+  const questions = useMemo(() => {
+    if (!selectedChild) return [];
+    return getQuestionsForAge(Number(selectedChild.ageMonths));
+  }, [selectedChild]);
 
   useEffect(() => {
-    async function fetchChildren() {
+    async function loadProfile() {
       if (!currentUser) return;
 
-      try {
-        const childrenRef = collection(db, 'users', currentUser.uid, 'children');
-        const childrenQuery = query(childrenRef, orderBy('createdAt', 'desc'));
-        const childrenSnap = await getDocs(childrenQuery);
+      const userRef = doc(db, 'users', currentUser.uid);
+      const userSnap = await getDoc(userRef);
 
-        const childrenList = childrenSnap.docs.map((docItem) => ({
-          id: docItem.id,
-          ...docItem.data(),
-        }));
-
-        setChildren(childrenList);
-      } catch (error) {
-        console.log('Error loading child profiles:', error);
+      if (userSnap.exists()) {
+        setProfile(userSnap.data());
       }
     }
 
-    fetchChildren();
+    loadProfile();
   }, [currentUser]);
 
   useEffect(() => {
-    async function fetchDevelopmentChecks() {
-      if (!currentUser) return;
-
-      try {
-        const checksRef = collection(db, 'users', currentUser.uid, 'developmentChecks');
-        const checksQuery = query(checksRef, orderBy('checkedAt', 'desc'), limit(5));
-        const checksSnap = await getDocs(checksQuery);
-
-        const checksList = checksSnap.docs.map((docItem) => ({
-          id: docItem.id,
-          ...docItem.data(),
-        }));
-
-        setDevelopmentChecks(checksList);
-      } catch (error) {
-        console.log('Error loading development check history:', error);
-      }
-    }
-
-    fetchDevelopmentChecks();
+    loadChildren();
+    loadDevelopmentChecks();
   }, [currentUser]);
+
+  async function loadChildren() {
+    if (!currentUser) return;
+
+    const childrenRef = collection(db, 'users', currentUser.uid, 'children');
+    const childrenQuery = query(childrenRef, orderBy('createdAt', 'desc'));
+    const childrenSnap = await getDocs(childrenQuery);
+
+    const list = childrenSnap.docs.map((item) => ({
+      id: item.id,
+      ...item.data(),
+    }));
+
+    setChildren(list);
+
+    if (!selectedChild && list.length > 0) {
+      setSelectedChild(list[0]);
+      localStorage.setItem('selectedChildId', list[0].id);
+    }
+  }
+
+  async function loadDevelopmentChecks() {
+    if (!currentUser) return;
+
+    const checksRef = collection(db, 'users', currentUser.uid, 'developmentChecks');
+    const checksQuery = query(checksRef, orderBy('checkedAt', 'desc'), limit(10));
+    const checksSnap = await getDocs(checksQuery);
+
+    const list = checksSnap.docs.map((item) => ({
+      id: item.id,
+      ...item.data(),
+    }));
+
+    setDevelopmentChecks(list);
+  }
 
   async function handleLogout() {
-    try {
-      await signOut(auth);
-      navigate('/');
-    } catch (error) {
-      console.log('Logout error:', error);
-    }
-  }
-
-  function getDevelopmentResult(months) {
-    if (months <= 12) {
-      return developmentData.infant;
-    }
-
-    if (months <= 24) {
-      return developmentData.toddler1;
-    }
-
-    return developmentData.toddler2;
-  }
-
-  function handleDevelopmentCheck() {
-    const enteredAge = parseInt(age, 10);
-
-    setError('');
-    setCheckMessage('');
-    setResult(null);
-
-    if (Number.isNaN(enteredAge) || enteredAge < 0 || enteredAge > 36) {
-      setError('Please enter a valid age between 0 and 36 months.');
-      return;
-    }
-
-    setResult(getDevelopmentResult(enteredAge));
+    await signOut(auth);
+    navigate('/');
   }
 
   async function handleSaveChild(e) {
     e.preventDefault();
-
     setChildMessage('');
 
     if (!currentUser) {
-      setChildMessage('You must be logged in to save a child profile.');
+      setChildMessage('Please log in first.');
       return;
     }
 
-    const parsedAge = parseInt(childAge, 10);
+    const parsedAge = Number(childAge);
 
-    if (!childName || !childAge || !childGender) {
-      setChildMessage('Please fill in child name, age, and gender.');
+    if (!childName || childAge === '' || !childGender) {
+      setChildMessage('Please fill in all child profile fields.');
       return;
     }
 
     if (Number.isNaN(parsedAge) || parsedAge < 0 || parsedAge > 36) {
-      setChildMessage('Child age must be between 0 and 36 months.');
+      setChildMessage('Age must be between 0 and 36 months.');
       return;
     }
 
     try {
-      const childrenRef = collection(db, 'users', currentUser.uid, 'children');
+      if (editingChildId) {
+        const childRef = doc(db, 'users', currentUser.uid, 'children', editingChildId);
 
-      const docRef = await addDoc(childrenRef, {
-        childName,
-        ageMonths: parsedAge,
-        gender: childGender,
-        createdAt: serverTimestamp(),
-      });
+        await updateDoc(childRef, {
+          childName,
+          ageMonths: parsedAge,
+          gender: childGender,
+          updatedAt: serverTimestamp(),
+        });
 
-      const newChild = {
-        id: docRef.id,
-        childName,
-        ageMonths: parsedAge,
-        gender: childGender,
-      };
+        setChildMessage('Child profile updated successfully.');
+      } else {
+        const childrenRef = collection(db, 'users', currentUser.uid, 'children');
 
-      setChildren((prevChildren) => [newChild, ...prevChildren]);
+        await addDoc(childrenRef, {
+          childName,
+          ageMonths: parsedAge,
+          gender: childGender,
+          createdAt: serverTimestamp(),
+        });
+
+        setChildMessage('Child profile saved successfully.');
+      }
 
       setChildName('');
       setChildAge('');
       setChildGender('');
-      setChildMessage('Child profile saved successfully.');
+      setEditingChildId(null);
+      await loadChildren();
     } catch (error) {
-      console.log('Error saving child profile:', error);
-      setChildMessage('Unable to save child profile. Please try again.');
+      console.log(error);
+      setChildMessage('Unable to save child profile. Check Firebase rules.');
     }
   }
 
-  function handleUseChildAge(child) {
-    setSelectedChild(child);
-    setAge(String(child.ageMonths));
-    setError('');
-    setCheckMessage('');
-    setResult(getDevelopmentResult(child.ageMonths));
+  function handleEditChild(child) {
+    setEditingChildId(child.id);
+    setChildName(child.childName);
+    setChildAge(String(child.ageMonths));
+    setChildGender(child.gender);
   }
 
-  async function handleSaveDevelopmentCheck() {
+  async function handleDeleteChild(childId) {
+    if (!currentUser) return;
+
+    try {
+      await deleteDoc(doc(db, 'users', currentUser.uid, 'children', childId));
+
+      if (selectedChild?.id === childId) {
+        setSelectedChild(null);
+        setAnswers({});
+        setResult(null);
+        localStorage.removeItem('selectedChildId');
+      }
+
+      await loadChildren();
+      setChildMessage('Child profile deleted.');
+    } catch (error) {
+      console.log(error);
+      setChildMessage('Unable to delete child profile.');
+    }
+  }
+
+  function handleSelectChild(child) {
+    setSelectedChild(child);
+    localStorage.setItem('selectedChildId', child.id);
+    setAnswers({});
+    setResult(null);
+    setCheckMessage('');
+  }
+
+  function handleAnswer(questionId, value) {
+    setAnswers((prev) => ({
+      ...prev,
+      [questionId]: value,
+    }));
+  }
+
+  function calculateResult() {
+    setCheckMessage('');
+
+    if (!selectedChild) {
+      setCheckMessage('Please select or add a child profile first.');
+      return;
+    }
+
+    if (questions.length === 0) {
+      setCheckMessage('No questions found for this age.');
+      return;
+    }
+
+    const unanswered = questions.filter((q) => !answers[q.id]);
+
+    if (unanswered.length > 0) {
+      setCheckMessage('Please answer all questions before checking result.');
+      return;
+    }
+
+    const categories = {};
+
+    questions.forEach((q) => {
+      if (!categories[q.category]) {
+        categories[q.category] = {
+          total: 0,
+          yes: 0,
+        };
+      }
+
+      categories[q.category].total += 1;
+
+      if (answers[q.id] === 'yes') {
+        categories[q.category].yes += 1;
+      }
+    });
+
+    const categorySummary = Object.keys(categories).map((category) => {
+      const item = categories[category];
+      const score = Math.round((item.yes / item.total) * 100);
+
+      return {
+        category,
+        score,
+        total: item.total,
+        yes: item.yes,
+      };
+    });
+
+    const totalYes = categorySummary.reduce((sum, item) => sum + item.yes, 0);
+    const totalQuestions = categorySummary.reduce((sum, item) => sum + item.total, 0);
+    const score = Math.round((totalYes / totalQuestions) * 100);
+
+    const weakestCategory =
+      [...categorySummary].sort((a, b) => a.score - b.score)[0]?.category || 'General';
+
+    const feedback = getSafeFeedback(score);
+    const suggestedActivities = getActivitySuggestions(
+      Number(selectedChild.ageMonths),
+      weakestCategory
+    );
+
+    setResult({
+      childId: selectedChild.id,
+      childName: selectedChild.childName,
+      ageMonths: selectedChild.ageMonths,
+      score,
+      categorySummary,
+      weakestCategory,
+      feedback,
+      suggestedActivities,
+      answers,
+      questions,
+    });
+  }
+
+  async function handleSaveCheckResult() {
     if (!currentUser) {
-      setCheckMessage('You must be logged in to save this check.');
+      setCheckMessage('Please log in first.');
       return;
     }
 
     if (!result) {
-      setCheckMessage('Please run a development check before saving.');
-      return;
-    }
-
-    const enteredAge = parseInt(age, 10);
-
-    if (Number.isNaN(enteredAge) || enteredAge < 0 || enteredAge > 36) {
-      setCheckMessage('Please enter a valid age before saving.');
+      setCheckMessage('Run the checker before saving.');
       return;
     }
 
     try {
       const checksRef = collection(db, 'users', currentUser.uid, 'developmentChecks');
 
-      const checkData = {
-        childId: selectedChild?.id || null,
-        childName: selectedChild?.childName || 'Manual age entry',
-        ageMonths: enteredAge,
-        developmentRange: result.label,
-        milestones: result.milestones,
-        activities: result.activities,
+      await addDoc(checksRef, {
+        ...result,
         checkedAt: serverTimestamp(),
-      };
-
-      const docRef = await addDoc(checksRef, checkData);
-      setSelectedCheck({
-  id: docRef.id,
-  ...checkData,
-  checkedAt: new Date(),
-});
-
-      setDevelopmentChecks((prevChecks) => [
-        {
-          id: docRef.id,
-          ...checkData,
-          checkedAt: new Date(),
-        },
-        ...prevChecks.slice(0, 4),
-      ]);
+      });
 
       setCheckMessage('Development check saved successfully.');
+      await loadDevelopmentChecks();
     } catch (error) {
-      console.log('Error saving development check:', error);
-      setCheckMessage('Unable to save development check. Please try again.');
+      console.log(error);
+      setCheckMessage('Unable to save development check. Check Firebase rules.');
     }
   }
 
-  function formatCheckDate(check) {
-    if (!check.checkedAt) {
-      return 'Just now';
-    }
-
-    if (check.checkedAt.toDate) {
-      return check.checkedAt.toDate().toLocaleDateString();
-    }
-
-    if (check.checkedAt instanceof Date) {
-      return check.checkedAt.toLocaleDateString();
-    }
-
+  function formatDate(item) {
+    if (!item?.checkedAt) return 'Recently';
+    if (item.checkedAt.toDate) return item.checkedAt.toDate().toLocaleDateString();
     return 'Recently';
+  }
+
+  function getScoreClass(score) {
+    if (score >= 80) return 'score-good';
+    if (score >= 60) return 'score-medium';
+    return 'score-low';
+  }
+
+  function getLatestCategorySummary() {
+    if (!latestCheck?.categorySummary) return [];
+    return latestCheck.categorySummary;
+  }
+
+  function getAnsweredCount() {
+    return Object.keys(answers).length;
   }
 
   return (
     <div className="dashboard-page">
       <header className="dashboard-topbar">
         <div className="container">
-          <div className="topbar-brand">
-            <span className="tb-icon">🌱</span>
-            ECD Parenting System
-          </div>
+          <div className="topbar-brand">🌱 ECD Parenting System</div>
 
           <div className="topbar-user">
             <div className="user-avatar">{avatarLetter}</div>
 
             <div className="user-info">
               <span className="user-name">{userName}</span>
-              <span className="user-meta">
-                {userRole === 'admin' ? 'Admin' : 'Parent'} • {userEmail}
-              </span>
+              <span className="user-meta">{userEmail}</span>
             </div>
+
+            <Link to="/chatbot" className="logout-btn">
+              Chatbot
+            </Link>
 
             <button onClick={handleLogout} className="logout-btn">
               Logout
@@ -376,17 +364,80 @@ function Dashboard() {
       <main className="dashboard-main">
         <div className="container">
           <div className="welcome-banner">
-            <span className="dashboard-status">Authenticated Parent Portal</span>
-
-            <h2>
-              {profileLoading ? 'Loading profile...' : `Welcome back, ${userName}!`}
-            </h2>
-
+            <span className="dashboard-status">Parent Portal</span>
+            <h2>Welcome back, {userName}!</h2>
             <p>
-              Track your child&apos;s development, review age-based activities, and explore
-              parenting guidance in one secure dashboard.
+              Manage child profiles, complete development checks, review progress,
+              and see safe activity suggestions.
             </p>
           </div>
+
+          <div className="premium-stats-grid">
+            <div className="premium-stat-card">
+              <span>👶</span>
+              <div>
+                <p>Children</p>
+                <h3>{children.length}</h3>
+              </div>
+            </div>
+
+            <div className="premium-stat-card">
+              <span>📊</span>
+              <div>
+                <p>Assessments</p>
+                <h3>{developmentChecks.length}</h3>
+              </div>
+            </div>
+
+            <div className="premium-stat-card">
+              <span>🎯</span>
+              <div>
+                <p>Latest Score</p>
+                <h3>{latestCheck ? `${latestCheck.score}%` : '--'}</h3>
+              </div>
+            </div>
+
+            <div className="premium-stat-card">
+              <span>🤖</span>
+              <div>
+                <p>AI Assistant</p>
+                <h3>Ready</h3>
+              </div>
+            </div>
+          </div>
+
+          {latestCheck && (
+            <div className="premium-progress-card">
+              <div className="premium-section-header">
+                <div>
+                  <h3>Development Overview</h3>
+                  <p>Latest saved assessment summary</p>
+                </div>
+
+                <div className={`score-pill ${getScoreClass(latestCheck.score)}`}>
+                  {latestCheck.score}%
+                </div>
+              </div>
+
+              <div className="progress-bars-list">
+                {getLatestCategorySummary().map((item) => (
+                  <div className="progress-row" key={item.category}>
+                    <div className="progress-label">
+                      <span>{item.category}</span>
+                      <strong>{item.score}%</strong>
+                    </div>
+
+                    <div className="progress-track">
+                      <div
+                        className={`progress-fill ${getScoreClass(item.score)}`}
+                        style={{ width: `${item.score}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="dashboard-grid">
             <div className="dash-card">
@@ -395,40 +446,33 @@ function Dashboard() {
                 <h3>Child Profile</h3>
               </div>
 
-              <p className="dash-card-desc">
-                Save your child&apos;s basic details so the dashboard can support personalized development tracking.
-              </p>
-
               <form onSubmit={handleSaveChild} className="child-profile-form">
                 <div className="form-group">
-                  <label htmlFor="child-name">Child Name</label>
+                  <label>Child Name</label>
                   <input
                     type="text"
-                    id="child-name"
-                    placeholder="e.g. Ayaan"
                     value={childName}
                     onChange={(e) => setChildName(e.target.value)}
+                    placeholder="e.g. Ayaan"
                   />
                 </div>
 
                 <div className="child-form-row">
                   <div className="form-group">
-                    <label htmlFor="child-profile-age">Age (months)</label>
+                    <label>Age Months</label>
                     <input
                       type="number"
-                      id="child-profile-age"
-                      placeholder="e.g. 18"
                       min="0"
                       max="36"
                       value={childAge}
                       onChange={(e) => setChildAge(e.target.value)}
+                      placeholder="18"
                     />
                   </div>
 
                   <div className="form-group">
-                    <label htmlFor="child-gender">Gender</label>
+                    <label>Gender</label>
                     <select
-                      id="child-gender"
                       value={childGender}
                       onChange={(e) => setChildGender(e.target.value)}
                     >
@@ -440,37 +484,80 @@ function Dashboard() {
                   </div>
                 </div>
 
-                <button type="submit" className="btn btn-primary form-btn">
-                  Save Child Profile
+                <button className="btn btn-primary form-btn" type="submit">
+                  {editingChildId ? 'Update Child Profile' : 'Save Child Profile'}
                 </button>
+
+                {editingChildId && (
+                  <button
+                    type="button"
+                    className="btn btn-outline form-btn"
+                    onClick={() => {
+                      setEditingChildId(null);
+                      setChildName('');
+                      setChildAge('');
+                      setChildGender('');
+                    }}
+                  >
+                    Cancel Edit
+                  </button>
+                )}
               </form>
 
               {childMessage && <p className="child-message">{childMessage}</p>}
 
-              {children.length > 0 && (
-                <div className="saved-children">
-                  <h4>Saved Child Profile</h4>
+              <div className="saved-children">
+                <h4>Saved Children</h4>
 
-                  {children.map((child) => (
-                    <div className="saved-child-card" key={child.id}>
+                {children.length === 0 && <p>No child profile added yet.</p>}
+
+                {children.map((child) => (
+                  <div
+                    className={
+                      selectedChild?.id === child.id
+                        ? 'saved-child-card selected-child-card'
+                        : 'saved-child-card'
+                    }
+                    key={child.id}
+                  >
+                    <div className="child-card-left">
+                      <div className="child-mini-avatar">👶</div>
                       <div>
                         <strong>{child.childName}</strong>
                         <p>
                           {child.ageMonths} months • {child.gender}
                         </p>
                       </div>
+                    </div>
+
+                    <div className="check-actions">
+                      <button
+                        type="button"
+                        className="use-age-btn"
+                        onClick={() => handleSelectChild(child)}
+                      >
+                        Select
+                      </button>
 
                       <button
                         type="button"
                         className="use-age-btn"
-                        onClick={() => handleUseChildAge(child)}
+                        onClick={() => handleEditChild(child)}
                       >
-                        Use Age
+                        Edit
+                      </button>
+
+                      <button
+                        type="button"
+                        className="use-age-btn"
+                        onClick={() => handleDeleteChild(child.id)}
+                      >
+                        Delete
                       </button>
                     </div>
-                  ))}
-                </div>
-              )}
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div className="dash-card">
@@ -479,203 +566,245 @@ function Dashboard() {
                 <h3>Development Checker</h3>
               </div>
 
-              <p className="dash-card-desc">
-                Enter your child&apos;s age in months to see expected milestones and activities.
-              </p>
-
-              {selectedChild && (
-                <div className="selected-child-note">
-                  Using saved profile: <strong>{selectedChild.childName}</strong>
-                </div>
+              {!selectedChild && (
+                <p className="dash-card-desc">
+                  Select a saved child profile to start the checker.
+                </p>
               )}
 
-              <div className="age-input-row">
-                <div className="form-group">
-                  <label htmlFor="child-age">Child&apos;s Age (months)</label>
-                  <input
-                    type="number"
-                    id="child-age"
-                    placeholder="e.g. 18"
-                    min="0"
-                    max="36"
-                    value={age}
-                    onChange={(e) => {
-                      setAge(e.target.value);
-                      setSelectedChild(null);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        handleDevelopmentCheck();
-                      }
-                    }}
-                  />
-                </div>
-
-                <button onClick={handleDevelopmentCheck} className="btn btn-primary check-btn">
-                  Check Now
-                </button>
-              </div>
-
-              {error && <p className="dev-error">{error}</p>}
-
-              {result && (
-                <div className="dev-result">
-                  <div className="result-block">
-                    <h4>Development Milestones - {result.label}</h4>
-                    <ul>
-                      {result.milestones.map((milestone, index) => (
-                        <li key={index}>{milestone}</li>
-                      ))}
-                    </ul>
+              {selectedChild && (
+                <>
+                  <div className="selected-child-note">
+                    Selected child: <strong>{selectedChild.childName}</strong> •{' '}
+                    {selectedChild.ageMonths} months
                   </div>
 
-                  <div className="result-block activity-block">
-                    <h4>Recommended Activities</h4>
-                    <ul>
-                      {result.activities.map((activity, index) => (
-                        <li key={index}>{activity}</li>
-                      ))}
-                    </ul>
+                  <div className="checker-progress-box">
+                    <div>
+                      <strong>
+                        Question Progress: {getAnsweredCount()} of {questions.length}
+                      </strong>
+                      <p>Answer all questions to calculate the result.</p>
+                    </div>
+
+                    <div className="checker-progress-track">
+                      <div
+                        className="checker-progress-fill"
+                        style={{
+                          width:
+                            questions.length > 0
+                              ? `${Math.round((getAnsweredCount() / questions.length) * 100)}%`
+                              : '0%',
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+
+                  <div className="question-list">
+                    {questions.map((q) => (
+                      <div className="question-card" key={q.id}>
+                        <strong>{q.category}</strong>
+                        <p>{q.question}</p>
+
+                        <div className="answer-row">
+                          <label>
+                            <input
+                              type="radio"
+                              name={q.id}
+                              checked={answers[q.id] === 'yes'}
+                              onChange={() => handleAnswer(q.id, 'yes')}
+                            />
+                            Yes
+                          </label>
+
+                          <label>
+                            <input
+                              type="radio"
+                              name={q.id}
+                              checked={answers[q.id] === 'not_yet'}
+                              onChange={() => handleAnswer(q.id, 'not_yet')}
+                            />
+                            Not Yet
+                          </label>
+                        </div>
+                      </div>
+                    ))}
                   </div>
 
                   <button
                     type="button"
+                    className="btn btn-primary form-btn"
+                    onClick={calculateResult}
+                  >
+                    Check Result
+                  </button>
+                </>
+              )}
+
+              {checkMessage && <p className="check-message">{checkMessage}</p>}
+
+              {result && (
+                <div className="dev-result">
+                  <div className="premium-section-header">
+                    <div>
+                      <h4>Result Summary</h4>
+                      <p>{result.feedback}</p>
+                    </div>
+
+                    <div className={`score-pill ${getScoreClass(result.score)}`}>
+                      {result.score}%
+                    </div>
+                  </div>
+
+                  <p>
+                    <strong>Area needing most support:</strong>{' '}
+                    {result.weakestCategory}
+                  </p>
+
+                  <h4>Category Summary</h4>
+
+                  <div className="progress-bars-list">
+                    {result.categorySummary.map((item) => (
+                      <div className="progress-row" key={item.category}>
+                        <div className="progress-label">
+                          <span>{item.category}</span>
+                          <strong>{item.score}%</strong>
+                        </div>
+
+                        <div className="progress-track">
+                          <div
+                            className={`progress-fill ${getScoreClass(item.score)}`}
+                            style={{ width: `${item.score}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <h4>Suggested Activities</h4>
+                  <ul>
+                    {result.suggestedActivities.map((activity, index) => (
+                      <li key={index}>{activity}</li>
+                    ))}
+                  </ul>
+
+                  <button
+                    type="button"
                     className="save-check-btn"
-                    onClick={handleSaveDevelopmentCheck}
+                    onClick={handleSaveCheckResult}
                   >
                     Save Check Result
                   </button>
                 </div>
               )}
-
-              {checkMessage && <p className="check-message">{checkMessage}</p>}
-
-             {developmentChecks.length > 0 && (
-  <div className="recent-checks">
-    <h4>Recent Development Checks</h4>
-
-    {developmentChecks.map((check) => (
-      <div className="recent-check-card" key={check.id}>
-        <div>
-          <strong>{check.childName}</strong>
-          <p>
-            {check.ageMonths} months • {check.developmentRange}
-          </p>
-        </div>
-
-        <div className="check-actions">
-          <span>{formatCheckDate(check)}</span>
-          <button
-            type="button"
-            className="view-details-btn"
-            onClick={() => setSelectedCheck(check)}
-          >
-            View Details
-          </button>
-        </div>
-      </div>
-    ))}
-
-    {selectedCheck && (
-      <div className="check-detail-panel">
-        <div className="check-detail-header">
-          <div>
-            <h4>Development Check Details</h4>
-            <p>
-              {selectedCheck.childName} • {selectedCheck.ageMonths} months •{' '}
-              {selectedCheck.developmentRange}
-            </p>
-          </div>
-
-          <button
-            type="button"
-            className="close-detail-btn"
-            onClick={() => setSelectedCheck(null)}
-          >
-            ×
-          </button>
-        </div>
-
-        <div className="detail-section">
-          <h5>Milestones Shown</h5>
-          <ul>
-            {selectedCheck.milestones?.map((milestone, index) => (
-              <li key={index}>{milestone}</li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="detail-section activity-detail">
-          <h5>Recommended Activities</h5>
-          <ul>
-            {selectedCheck.activities?.map((activity, index) => (
-              <li key={index}>{activity}</li>
-            ))}
-          </ul>
-        </div>
-      </div>
-    )}
-  </div>
-)}
-            </div>
-
-            <div className="dash-card coming-soon-card">
-              <div className="dash-card-header">
-                <div className="dash-card-icon icon-purple">🤖</div>
-                <h3>AI Parenting Assistant</h3>
-              </div>
-
-              <p className="dash-card-desc">
-                Planned for the next development phase with real AI-powered parenting support.
-              </p>
-
-              <div className="future-badge">Future AI Feature</div>
             </div>
 
             <div className="dash-card dash-card-full">
               <div className="dash-card-header">
-                <div className="dash-card-icon icon-blush">📖</div>
-                <h3>Parenting Tips</h3>
+                <div className="dash-card-icon icon-amber">📌</div>
+                <h3>Parent Dashboard Summary</h3>
               </div>
 
-              <div className="tips-tabs">
-                <button
-                  className={`tip-tab ${activeTip === 'nutrition' ? 'active' : ''}`}
-                  onClick={() => setActiveTip('nutrition')}
-                >
-                  🥗 Nutrition
-                </button>
+              <div className="summary-grid">
+                <div className="summary-box">
+                  <strong>Selected Child</strong>
+                  <p>
+                    {selectedChild
+                      ? `${selectedChild.childName}, ${selectedChild.ageMonths} months`
+                      : 'No child selected'}
+                  </p>
+                </div>
 
-                <button
-                  className={`tip-tab ${activeTip === 'behavior' ? 'active' : ''}`}
-                  onClick={() => setActiveTip('behavior')}
-                >
-                  💛 Behavior
-                </button>
+                <div className="summary-box">
+                  <strong>Latest Score</strong>
+                  <p>{latestCheck ? `${latestCheck.score}%` : 'No checks saved yet'}</p>
+                </div>
 
-                <button
-                  className={`tip-tab ${activeTip === 'learning' ? 'active' : ''}`}
-                  onClick={() => setActiveTip('learning')}
-                >
-                  🧠 Learning
-                </button>
-
-                <button
-                  className={`tip-tab ${activeTip === 'islamic' ? 'active' : ''}`}
-                  onClick={() => setActiveTip('islamic')}
-                >
-                  🕌 Islamic Practices
-                </button>
+                <div className="summary-box">
+                  <strong>Weakest Category</strong>
+                  <p>{latestCheck?.weakestCategory || 'Not available yet'}</p>
+                </div>
               </div>
 
-              <div className="tip-content active">
-                {parentingTips[activeTip].map((tip, index) => (
-                  <div className="tip-item" key={index}>
-                    <span className="tip-emoji">✓</span>
-                    <span>{tip}</span>
+              {latestCheck?.suggestedActivities?.length > 0 && (
+                <>
+                  <h4>Recommended Activities</h4>
+                  <ul>
+                    {latestCheck.suggestedActivities.slice(0, 5).map((activity, index) => (
+                      <li key={index}>{activity}</li>
+                    ))}
+                  </ul>
+                </>
+              )}
+
+              <h4>Recent Check History</h4>
+
+              {developmentChecks.length === 0 && (
+                <div className="premium-empty-state">
+                  <span>📋</span>
+                  <strong>No assessments yet</strong>
+                  <p>Start your child’s first development check to see progress here.</p>
+                </div>
+              )}
+
+              {developmentChecks.map((check) => (
+                <div className="recent-check-card" key={check.id}>
+                  <div>
+                    <strong>{check.childName}</strong>
+                    <p>
+                      {check.ageMonths} months • Score {check.score}% •{' '}
+                      {check.weakestCategory}
+                    </p>
                   </div>
-                ))}
-              </div>
+
+                  <div className="check-actions">
+                    <span>{formatDate(check)}</span>
+                    <button
+                      type="button"
+                      className="view-details-btn"
+                      onClick={() => setSelectedCheck(check)}
+                    >
+                      View
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {selectedCheck && (
+                <div className="check-detail-panel">
+                  <div className="check-detail-header">
+                    <div>
+                      <h4>Saved Check Details</h4>
+                      <p>
+                        {selectedCheck.childName} • {selectedCheck.ageMonths} months
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="close-detail-btn"
+                      onClick={() => setSelectedCheck(null)}
+                    >
+                      ×
+                    </button>
+                  </div>
+
+                  <p>
+                    <strong>Score:</strong> {selectedCheck.score}%
+                  </p>
+                  <p>
+                    <strong>Support Area:</strong> {selectedCheck.weakestCategory}
+                  </p>
+                  <p>{selectedCheck.feedback}</p>
+
+                  <h5>Activities Saved</h5>
+                  <ul>
+                    {selectedCheck.suggestedActivities?.map((activity, index) => (
+                      <li key={index}>{activity}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
         </div>
