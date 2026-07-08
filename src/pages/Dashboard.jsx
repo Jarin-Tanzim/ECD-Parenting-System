@@ -349,6 +349,9 @@ function Dashboard() {
               <span className="user-name">{userName}</span>
               <span className="user-meta">{userEmail}</span>
             </div>
+            <Link to="/parenting-tips" className="logout-btn">
+  Parenting Tips
+</Link>
 
             <Link to="/chatbot" className="logout-btn">
               Chatbot
