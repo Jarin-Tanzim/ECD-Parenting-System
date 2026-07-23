@@ -1,116 +1,108 @@
 # 🌱 ECD Parenting System
 
-An AI-powered web application designed to help parents monitor early childhood development through age-based milestone assessments, personalized activity recommendations, and an intelligent parenting assistant powered by Google Gemini AI.
+An AI-powered web application that helps parents monitor early childhood development through age-based milestone assessments, personalized activity recommendations, and intelligent parenting guidance.
 
 ---
 
-## Overview
+## 📖 Overview
 
-The ECD Parenting System enables parents to:
+The **ECD Parenting System** is designed to support parents and caregivers in monitoring the developmental progress of children from birth to 36 months.
 
-- Create and manage child profiles
-- Perform age-based developmental assessments
-- Track developmental progress over time
-- Receive personalized activity recommendations
-- Interact with an AI parenting assistant
-- Access educational parenting resources
+The application combines evidence-based developmental assessments with cloud technology and artificial intelligence to provide personalized recommendations, progress tracking, and educational parenting guidance.
 
-The application uses Firebase Authentication, Cloud Firestore, and Google Gemini AI to provide a secure and intelligent parenting platform.
-
-> **Disclaimer**
->
-> This application is intended for educational and developmental guidance only and does not replace professional medical advice or diagnosis.
+This system is intended as a **development support tool** and **does not replace professional medical advice or diagnosis**.
 
 ---
 
-# Features
+# ✨ Features
 
 - 👶 Child Profile Management
-- 📊 Development Assessment
-- 📈 Progress Tracking
-- 🤖 AI Parenting Assistant
-- 🎯 Personalized Activity Recommendation
-- 📚 Parenting Tips
-- ☁ Firebase Authentication
-- 🔥 Cloud Firestore Integration
+- 📊 Age-Based Development Assessment
+- 📈 Progress Tracking Dashboard
+- 🎯 Personalized Activity Recommendations
+- 🤖 AI Parenting Assistant (Google Gemini)
+- 📚 Parenting Tips & Resources
+- 🔐 Secure User Authentication
+- ☁ Cloud Data Synchronization
 
 ---
 
-# Technologies
+# 🛠 Technologies
 
 | Category | Technology |
-|-----------|------------|
+|----------|------------|
 | Frontend | React |
 | Build Tool | Vite |
 | Styling | CSS |
+| Routing | React Router |
 | Authentication | Firebase Authentication |
 | Database | Cloud Firestore |
-| AI | Google Gemini API |
-| Routing | React Router |
+| Artificial Intelligence | Google Gemini API |
+| Version Control | Git & GitHub |
 
 ---
 
-# Documentation
+# 📚 System Documentation
 
-The complete system design documentation is available below.
-
----
-
-## System Architecture
-
-High-level architecture showing communication between the frontend, Firebase services, Firestore, and Google Gemini AI.
-
-![System Architecture](docs/diagrams/system-architecture.png)
+The following diagrams describe the design and implementation of the ECD Parenting System.
 
 ---
 
-## Application Workflow
+## 🏗 System Architecture
 
-Overall workflow from user authentication to development assessment and AI-assisted parenting guidance.
+Illustrates the overall system architecture, including the React frontend, Firebase services, Cloud Firestore, and Google Gemini AI.
 
-![Application Workflow](docs/diagrams/application-workflow.png)
-
----
-
-## Component Diagram
-
-Illustrates the software modules, application components, and their interactions.
-
-![Component Diagram](docs/diagrams/component-diagram.png)
+![System Architecture](doc/diagrams/system-architecture.png)
 
 ---
 
-## Firestore Entity Relationship Diagram
+## 🔄 Application Workflow
 
-Database schema and relationships between Firestore collections.
+Shows the complete application workflow from user authentication to AI-assisted parenting guidance.
 
-![Firestore ERD](docs/diagrams/firestore-erd.png)
-
----
-
-## AI Chatbot Sequence Diagram
-
-Sequence of interactions between the user, frontend, Firebase, Firestore, and Google Gemini AI.
-
-![Chatbot Sequence](docs/diagrams/chatbot-sequence.png)
+![Application Workflow](doc/diagrams/application-workflow.png)
 
 ---
 
-## Development Assessment Flow
+## 🧩 Component Diagram
 
-Flowchart illustrating how developmental assessments are performed and recommendations are generated.
+Describes the software components and interactions between application modules and backend services.
 
-![Development Assessment Flow](docs/diagrams/development-assessment-flow.png)
+![Component Diagram](doc/diagrams/component-diagram.png)
 
 ---
 
-# Project Structure
+## 🗄 Firestore Entity Relationship Diagram (ERD)
+
+Represents the Firestore collections, document relationships, and application data model.
+
+![Firestore ERD](doc/diagrams/firestore-erd.png)
+
+---
+
+## 🤖 AI Chatbot Sequence Diagram
+
+Illustrates the interaction between the user, frontend, Firebase, Firestore, and Google Gemini AI during a chatbot conversation.
+
+![Chatbot Sequence Diagram](doc/diagrams/chatbot-sequence.png)
+
+---
+
+## 📋 Development Assessment Flow
+
+Shows the workflow used to evaluate developmental milestones, calculate scores, and generate personalized recommendations.
+
+![Development Assessment Flow](doc/diagrams/development-assessment-flow.png)
+
+---
+
+# 📁 Project Structure
 
 ```text
-ECD-Parenting-System/
+ECD-Parenting-System
 │
-├── docs/
-│   └── diagrams/
+├── doc
+│   └── diagrams
 │       ├── application-workflow.png
 │       ├── chatbot-sequence.png
 │       ├── component-diagram.png
@@ -118,32 +110,35 @@ ECD-Parenting-System/
 │       ├── firestore-erd.png
 │       └── system-architecture.png
 │
-├── public/
+├── public
 │
-├── src/
-│   ├── assets/
-│   ├── components/
-│   ├── data/
-│   ├── firebase/
-│   ├── hooks/
-│   ├── pages/
-│   ├── services/
-│   ├── styles/
-│   └── utils/
+├── src
+│   ├── assets
+│   ├── components
+│   ├── data
+│   ├── firebase
+│   ├── hooks
+│   ├── pages
+│   ├── services
+│   ├── styles
+│   ├── utils
+│   ├── App.jsx
+│   └── main.jsx
 │
 ├── package.json
 ├── vite.config.js
+├── .env
 └── README.md
 ```
 
 ---
 
-# Installation
+# 🚀 Installation
 
 Clone the repository
 
 ```bash
-git clone https://github.com/<your-username>/ECD-Parenting-System.git
+git clone https://github.com/YOUR_USERNAME/ECD-Parenting-System.git
 ```
 
 Navigate into the project
@@ -158,7 +153,7 @@ Install dependencies
 npm install
 ```
 
-Create a `.env` file in the project root:
+Create a `.env` file in the project root.
 
 ```env
 VITE_FIREBASE_API_KEY=
@@ -171,7 +166,7 @@ VITE_FIREBASE_APP_ID=
 VITE_GEMINI_API_KEY=
 ```
 
-Start the development server
+Run the application
 
 ```bash
 npm run dev
@@ -179,18 +174,45 @@ npm run dev
 
 ---
 
-# Future Enhancements
+# 🧠 AI Integration
 
-- Mobile application support
-- Growth chart visualization
-- Pediatrician dashboard
-- Vaccination tracker
-- Multi-language support
-- Offline mode
-- AI model fine-tuned using child development literature
+The application integrates **Google Gemini AI** to provide personalized parenting guidance.
+
+The chatbot generates responses using:
+
+- Child profile information
+- Child age
+- Latest assessment results
+- Development history
+- Conversation context
+
+All conversations are securely stored using Cloud Firestore.
 
 ---
 
-# License
+# ☁ Firebase Services
 
-This project is released under the MIT License.
+The application uses Firebase for:
+
+- User Authentication
+- Cloud Firestore Database
+- Secure Data Storage
+- Real-Time Synchronization
+
+---
+
+# 📈 Future Enhancements
+
+- Mobile application
+- Pediatrician dashboard
+- Growth chart visualization
+- Vaccination tracker
+- Offline mode
+- Multi-language support
+- AI model trained on child development literature
+
+---
+
+# 📄 License
+
+This project is licensed under the MIT License.
